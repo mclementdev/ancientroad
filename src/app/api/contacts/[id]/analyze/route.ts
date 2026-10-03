@@ -3,6 +3,9 @@ import { AnalysisError, runContactAnalysis } from "@/lib/ai/analyze";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 
+// L'appel à Claude peut durer jusqu'à 60 s : on laisse de la marge à la fonction Vercel
+export const maxDuration = 90;
+
 const statusByCode: Record<string, number> = {
   rate_limited: 429,
   busy: 409,

@@ -20,7 +20,23 @@ import type {
   TripFormat,
 } from "../src/generated/prisma/enums";
 
-const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
+const connectionString = process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
+const db = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+
+/**
+ * Le seed EFFACE contacts, leads, réservations, catalogue… avant de recréer la démo.
+ * Sur une base distante (production), il faut le confirmer explicitement.
+ */
+function assertSeedAllowed() {
+  const host = connectionString ? new URL(connectionString).hostname : "";
+  const local = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(host);
+  if (!local && process.env.SEED_ALLOW_REMOTE !== "oui") {
+    throw new Error(
+      `Base distante (${host}) : le seed efface les données existantes. ` +
+        `Relancez avec SEED_ALLOW_REMOTE=oui si c'est bien voulu.`,
+    );
+  }
+}
 
 const NOW = new Date();
 const DAY = 86_400_000;
@@ -64,6 +80,7 @@ async function reset() {
 }
 
 async function main() {
+  assertSeedAllowed();
   const adminEmail = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
   const password = process.env.ADMIN_INITIAL_PASSWORD;
   if (!adminEmail || !password) {

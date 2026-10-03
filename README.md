@@ -79,6 +79,25 @@ Pour ajouter quelqu'un : *Utilisateurs* → *Inviter une personne*. Un lien vala
 | `ANTHROPIC_MODEL` | Modèle utilisé pour l'analyse, `claude-opus-5-5` par défaut. |
 | `LEADS_WEBHOOK_SECRET` | Secret partagé avec les formulaires du site, envoyé dans le header `X-Webhook-Secret`. |
 
+## Déploiement sur Vercel (avec Neon)
+
+Fichiers concernés :
+- `vercel.json` : le build applique les migrations (`prisma migrate deploy`) avant `next build` ; les fonctions tournent à Francfort (`fra1`).
+- `prisma.config.ts` : les migrations et le seed utilisent la connexion directe `DATABASE_URL_UNPOOLED`.
+
+Étapes :
+1. Poussez le dépôt sur GitHub, puis importez-le dans Vercel (*Add New → Project*).
+2. Dans le projet Vercel, ouvrez *Storage → Create Database → Neon*. Choisissez la région **AWS eu-central-1 (Frankfurt)** pour être au plus près des fonctions. L'intégration ajoute `DATABASE_URL` et `DATABASE_URL_UNPOOLED`.
+3. Dans *Settings → Environment Variables*, ajoutez les autres variables du tableau ci-dessus. Utilisez des secrets **différents** de ceux du développement local, et mettez dans `APP_URL` l'URL réelle du projet.
+4. Redéployez. Les migrations s'appliquent pendant le build.
+5. Chargez les données une seule fois, depuis votre poste. Le seed efface les données existantes, d'où la confirmation `SEED_ALLOW_REMOTE=oui` exigée sur une base distante :
+
+```bash
+SEED_ALLOW_REMOTE=oui DATABASE_URL_UNPOOLED="<URL directe Neon>" ADMIN_INITIAL_PASSWORD="<mot de passe prod>" npm run db:seed
+```
+
+L'analyse IA déclare `maxDuration = 90` secondes, ce qui laisse passer l'appel à Claude, limité à 60 s.
+
 ## Brancher les formulaires du site sur `/api/leads`
 
 **Le secret ne doit jamais apparaître dans le navigateur.** L'appel doit venir d'un serveur : le backend du site, une fonction serverless, ou le webhook de votre outil de formulaires (Webflow, Typeform, Tally…). Ne mettez pas le secret dans du JavaScript côté client.
