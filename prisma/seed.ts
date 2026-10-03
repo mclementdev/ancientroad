@@ -677,7 +677,7 @@ async function main() {
       summary,
       traveler_profile: { motivations: ["Découverte"], style: "Analyse de démonstration générée par le seed", budget_estimate: "Non estimé" },
       recommended_trips: [],
-      next_actions: [{ action: "Lancer une vraie analyse avec Claude", channel: "CRM", deadline: dateOnly(1).toISOString().slice(0, 10), priority: "moyenne" }],
+      next_actions: [{ action: "Lancer une vraie analyse avec Claude", channel: "telephone", deadline: dateOnly(1).toISOString().slice(0, 10), priority: "moyenne" }],
       risks: [],
       missing_info: [],
       call_pitch: [],
