@@ -61,6 +61,8 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
   // Les managers voient l'équipe par défaut, les conseillers leurs propres tâches
   const team = sp.vue === "equipe" || (sp.vue !== "moi" && isManager(user));
   const data = await getDashboard({ userId: user.id, team });
+  // Composant serveur rendu à chaque requête : lire l'heure courante est voulu ici
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const firstName = user.name.split(" ")[0];
   const pending = data.callbacks.filter((t) => !t.doneAt).length;

@@ -136,15 +136,13 @@ export type RiderData = {
   riderRole: RiderRole | null;
   licenseType: LicenseType | null;
   licenseDate: string;
+  licenseYears: number | null;
   ridingLevel: RidingLevel | null;
   heightCm: number | null;
   diet: string | null;
 };
 
 export function RiderBlock({ data, canEdit }: { data: RiderData; canEdit: boolean }) {
-  const licenseYears = data.licenseDate
-    ? Math.floor((Date.now() - new Date(data.licenseDate).getTime()) / (365.25 * 86_400_000))
-    : null;
   return (
     <EditableCard
       title="Profil rider"
@@ -156,7 +154,7 @@ export function RiderBlock({ data, canEdit }: { data: RiderData; canEdit: boolea
           items={[
             ["Rôle", data.riderRole && riderRoleLabels[data.riderRole]],
             ["Permis", data.licenseType && licenseTypeLabels[data.licenseType]],
-            ["Depuis", data.licenseDate && `${formatDate(data.licenseDate)} (${licenseYears} ans)`],
+            ["Depuis", data.licenseDate && `${formatDate(data.licenseDate)} (${data.licenseYears} ans)`],
             ["Niveau", data.ridingLevel && ridingLevelLabels[data.ridingLevel]],
             ["Taille", data.heightCm && `${data.heightCm} cm`],
             ["Régime", data.diet],

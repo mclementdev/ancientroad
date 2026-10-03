@@ -63,6 +63,8 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
   const statusRank: Record<LeadStatus, number> = { nouveau: 0, qualification: 1, devis_envoye: 2, injoignable: 3, gagne: 4, perdu: 5 };
   leads.sort((a, b) => statusRank[a.status] - statusRank[b.status]);
 
+  // Composant serveur rendu à chaque requête : lire l'heure courante est voulu ici
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const late = leads.filter((l) => l.status === "nouveau" && now - l.createdAt.getTime() > DAY).length;
   const userOptions = users.map((u) => [u.id, u.name] as [string, string]);

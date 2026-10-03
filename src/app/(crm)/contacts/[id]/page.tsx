@@ -15,6 +15,7 @@ import { contactStatusLabels, riderRoleLabels, taskTypeLabels } from "@/lib/labe
 import { canAssign, canEditContact } from "@/lib/permissions";
 import { requireUser } from "@/lib/session";
 import { getContactFile } from "@/server/queries/contact-file";
+import { computeAge } from "@/lib/domain/contact-stats";
 
 export async function generateMetadata({ params }: PageProps<"/contacts/[id]">): Promise<Metadata> {
   const { id } = await params;
@@ -117,6 +118,7 @@ export default async function ContactPage({ params }: PageProps<"/contacts/[id]"
               riderRole: c.riderRole,
               licenseType: c.licenseType,
               licenseDate: toDateInput(c.licenseDate),
+              licenseYears: computeAge(c.licenseDate),
               ridingLevel: c.ridingLevel,
               heightCm: c.heightCm,
               diet: c.diet,

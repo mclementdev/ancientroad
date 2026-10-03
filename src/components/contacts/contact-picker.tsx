@@ -31,22 +31,17 @@ export function ContactPicker({
 }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
-  const [results, setResults] = React.useState<PickedContact[]>([]);
-  const [loading, setLoading] = React.useState(false);
+  // Résultats associés à la requête qui les a produits : « en cours » se déduit de l'écart
+  const [found, setFound] = React.useState<{ query: string; results: PickedContact[] }>({ query: "", results: [] });
+  const searchable = query.trim().length >= 2;
+  const loading = searchable && found.query !== query;
 
   React.useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults([]);
-      return;
-    }
+    if (query.trim().length < 2) return;
     let cancelled = false;
-    setLoading(true);
     const t = setTimeout(async () => {
-      const r = await searchContactsAction(query);
-      if (!cancelled) {
-        setResults(r);
-        setLoading(false);
-      }
+      const results = await searchContactsAction(query);
+      if (!cancelled) setFound({ query, results });
     }, 200);
     return () => {
       cancelled = true;
@@ -54,7 +49,7 @@ export function ContactPicker({
     };
   }, [query]);
 
-  const visible = results.filter((r) => !excludeIds.includes(r.id));
+  const visible = searchable ? found.results.filter((r) => !excludeIds.includes(r.id)) : [];
 
   return (
     <>
@@ -72,7 +67,7 @@ export function ContactPicker({
           <Command shouldFilter={false}>
             <CommandInput placeholder="Nom, email, téléphone…" value={query} onValueChange={setQuery} />
             <CommandList>
-              <CommandEmpty>{query.length < 2 ? "Tapez au moins 2 caractères" : loading ? "Recherche…" : "Aucun contact"}</CommandEmpty>
+              <CommandEmpty>{!searchable ? "Tapez au moins 2 caractères" : loading ? "Recherche…" : "Aucun contact"}</CommandEmpty>
               {visible.length > 0 && (
                 <CommandGroup>
                   {visible.map((c) => (
