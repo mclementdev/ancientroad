@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Field, NativeSelect } from "@/components/common/form";
+import { DateTimeInput, Field, NativeSelect } from "@/components/common/form";
 import { FormDialog } from "@/components/common/form-dialog";
 import { EmptyState } from "@/components/common/page-header";
 import { BlockCard } from "@/components/contacts/editable-card";
@@ -310,7 +310,7 @@ export function InteractionFields({ state, defaultType = "call_out" }: { state: 
         <NativeSelect id="type" name="type" options={options(interactionTypeLabels)} defaultValue={defaultType} />
       </Field>
       <Field label="Date" name="occurredAt" state={state}>
-        <Input id="occurredAt" name="occurredAt" type="datetime-local" defaultValue={toDateTimeInput(new Date())} />
+        <DateTimeInput name="occurredAt" defaultValue={toDateTimeInput(new Date())} />
       </Field>
       <Field label="Objet" name="subject" state={state} className="sm:col-span-2">
         <Input id="subject" name="subject" />

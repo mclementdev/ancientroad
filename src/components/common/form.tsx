@@ -79,3 +79,38 @@ export function NativeSelect({
     </select>
   );
 }
+
+/**
+ * Champ date + heure en heure locale du navigateur. Le formulaire reçoit, sous `name`,
+ * la date convertie en ISO 8601 (UTC) pour que le serveur n'ait pas à deviner le fuseau.
+ */
+export function DateTimeInput({
+  name,
+  defaultValue = "",
+  className,
+  id,
+}: {
+  name: string;
+  defaultValue?: string;
+  className?: string;
+  id?: string;
+}) {
+  const [local, setLocal] = React.useState(defaultValue);
+  const parsed = local ? new Date(local) : null;
+  const iso = parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : "";
+  return (
+    <>
+      <input type="hidden" name={name} value={iso} />
+      <input
+        id={id ?? name}
+        type="datetime-local"
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        className={cn(
+          "h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+          className,
+        )}
+      />
+    </>
+  );
+}
