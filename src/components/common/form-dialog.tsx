@@ -41,13 +41,18 @@ export function FormDialog({ trigger, title, description, submitLabel = "Enregis
         </DialogHeader>
         {open && (
           <DialogForm
-            action={action}
-            submitLabel={submitLabel}
-            onDone={(state) => {
-              setOpen(false);
-              if (state.message) toast.success(state.message);
-              onSuccess?.(state);
+            // Toast et suite (redirection…) dans l'action elle-même : si la revalidation
+            // démonte ce dialogue (ligne qui disparaît d'une liste), ils s'exécutent quand même.
+            action={async (prev, formData) => {
+              const state = await action(prev, formData);
+              if (state?.ok) {
+                if (state.message) toast.success(state.message);
+                onSuccess?.(state);
+              }
+              return state;
             }}
+            submitLabel={submitLabel}
+            onDone={() => setOpen(false)}
             onCancel={() => setOpen(false)}
           >
             {children}
@@ -68,12 +73,12 @@ function DialogForm({
   action: Props["action"];
   submitLabel: string;
   children: Props["children"];
-  onDone: (state: NonNullable<ActionState>) => void;
+  onDone: () => void;
   onCancel: () => void;
 }) {
   const [state, formAction] = useActionState(action, null);
   useEffect(() => {
-    if (state?.ok) onDone(state);
+    if (state?.ok) onDone();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
   return (
