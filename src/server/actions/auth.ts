@@ -1,6 +1,7 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
+import bcrypt from "bcryptjs";
 import { AuthError } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -116,4 +117,25 @@ export async function acceptInvitationAction(_prev: ActionState, formData: FormD
     redirectTo: "/",
   });
   return result;
+}
+
+const passwordSchema = z
+  .object({
+    current: z.string().min(1, "Mot de passe actuel requis"),
+    password: z.string().min(10, "10 caractères minimum"),
+    confirm: z.string(),
+  })
+  .refine((d) => d.password === d.confirm, { path: ["confirm"], message: "Les mots de passe ne correspondent pas" });
+
+export async function changePasswordAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const me = await assertUser();
+    const data = passwordSchema.parse(formToObject(formData));
+    const user = await db.user.findUniqueOrThrow({ where: { id: me.id } });
+    if (!(await bcrypt.compare(data.current, user.passwordHash))) {
+      throw new UserFacingError("Mot de passe actuel incorrect");
+    }
+    await db.user.update({ where: { id: me.id }, data: { passwordHash: await hashPassword(data.password) } });
+    return { ok: true, message: "Mot de passe modifié" };
+  });
 }
