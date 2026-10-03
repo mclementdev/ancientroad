@@ -55,3 +55,32 @@ export function toDateTimeInput(value: Date | string | null | undefined): string
 export function fullName(c: { firstName: string; lastName: string }): string {
   return `${c.firstName} ${c.lastName}`;
 }
+
+export const APP_TIMEZONE = "Europe/Paris";
+
+/** Décalage (minutes) entre UTC et le fuseau donné à l'instant `date`. */
+function tzOffsetMinutes(date: Date, timeZone: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(date)
+      .map((p) => [p.type, p.value]),
+  );
+  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+  return Math.round((asUtc - date.getTime()) / 60_000);
+}
+
+/** Minuit (heure de Paris) du jour de `now`, indépendamment du fuseau du serveur. */
+export function startOfDayInAppTz(now: Date = new Date()): Date {
+  const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: APP_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const utcMidnight = new Date(`${ymd}T00:00:00Z`);
+  return new Date(utcMidnight.getTime() - tzOffsetMinutes(utcMidnight, APP_TIMEZONE) * 60_000);
+}
