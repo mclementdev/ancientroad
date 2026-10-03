@@ -1,0 +1,461 @@
+// Ancient Roads — schéma de données du CRM
+// Conventions : camelCase côté TypeScript, snake_case en base, montants en Decimal(10,2).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────── Enums ─────────────
+
+enum Role {
+  conseiller
+  manager
+  admin
+}
+
+enum Gender {
+  femme
+  homme
+  non_precise
+}
+
+enum ContactStatus {
+  prospect
+  client
+  fidele
+  inactif
+}
+
+enum RiderRole {
+  pilote
+  passager
+}
+
+enum LicenseType {
+  A
+  A2
+  A1
+  B_125
+  aucun
+}
+
+enum RidingLevel {
+  debutant
+  intermediaire
+  confirme
+  expert
+}
+
+enum LeadChannel {
+  email_form
+  callback
+  inbound_call
+}
+
+enum LeadStatus {
+  nouveau
+  qualification
+  devis_envoye
+  gagne
+  perdu
+  injoignable
+}
+
+enum TripFormat {
+  guide
+  liberte
+  sur_mesure
+}
+
+enum DepartureStatus {
+  ouvert
+  garanti
+  complet
+  annule
+  termine
+}
+
+enum BookingStatus {
+  option
+  confirme
+  solde
+  annule
+}
+
+enum RelationType {
+  conjoint
+  enfant
+  parent
+  frere_soeur
+  ami
+  collegue
+  autre
+}
+
+enum InterestLevel {
+  faible
+  moyen
+  fort
+}
+
+enum InterestSource {
+  formulaire
+  appel
+  email
+  salon
+  newsletter
+  conseiller
+}
+
+enum InteractionType {
+  call_in
+  call_out
+  email_in
+  email_out
+  newsletter_sent
+  newsletter_open
+  newsletter_click
+  callback
+  meeting
+  fair
+}
+
+enum Direction {
+  entrant
+  sortant
+}
+
+enum TaskType {
+  rappel
+  relance
+  devis
+  autre
+}
+
+enum AiLevel {
+  froid
+  tiede
+  chaud
+  pret_a_reserver
+}
+
+// ───────────── Utilisateurs & invitations ─────────────
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  role         Role     @default(conseiller)
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  ownedContacts Contact[]     @relation("ContactOwner")
+  assignedLeads Lead[]        @relation("LeadAssignee")
+  interactions  Interaction[]
+  tasks         Task[]        @relation("TaskAssignee")
+  analyses      AiAnalysis[]
+  invitations   Invitation[]
+
+  @@map("users")
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  email       String
+  role        Role      @default(conseiller)
+  token       String    @unique
+  invitedById String?   @map("invited_by")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  invitedBy User? @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@map("invitations")
+}
+
+// ───────────── Contacts ─────────────
+
+model Contact {
+  id          String        @id @default(cuid())
+  gender      Gender?
+  firstName   String        @map("first_name")
+  lastName    String        @map("last_name")
+  birthDate   DateTime?     @map("birth_date") @db.Date
+  email       String?       @unique // normalisé (trim + minuscules) ; plusieurs NULL autorisés
+  phoneMobile String?       @map("phone_mobile") // E.164
+  phoneHome   String?       @map("phone_home")
+  addressLine String?       @map("address_line")
+  postalCode  String?       @map("postal_code")
+  city        String?
+  country     String?       @default("FR") // ISO 3166-1 alpha-2
+  language    String        @default("fr")
+  status      ContactStatus @default(prospect)
+  ownerUserId String?       @map("owner_user_id")
+
+  // Profil rider (les motos sont toujours fournies par le tour-opérateur)
+  riderRole   RiderRole?   @map("rider_role")
+  licenseType LicenseType? @map("license_type")
+  licenseDate DateTime?    @map("license_date") @db.Date
+  ridingLevel RidingLevel? @map("riding_level")
+  heightCm    Int?         @map("height_cm")
+  diet        String?
+  freeNotes   String?      @map("free_notes") @db.Text
+
+  // Consentements
+  newsletterOptin Boolean   @default(false) @map("newsletter_optin")
+  smsOptin        Boolean   @default(false) @map("sms_optin")
+  consentDate     DateTime? @map("consent_date")
+
+  // Dénormalisés pour tri / filtres / tableau de bord
+  lastScore         Int?      @map("last_score")
+  lastScoreLevel    AiLevel?  @map("last_score_level")
+  lastAnalyzedAt    DateTime? @map("last_analyzed_at")
+  lastInteractionAt DateTime? @map("last_interaction_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner          User?                 @relation("ContactOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  leads          Lead[]
+  bookingsPaid   Booking[]             @relation("BookingPayer")
+  participations BookingParticipant[]
+  relationships  ContactRelationship[] @relation("RelFrom")
+  relatedTo      ContactRelationship[] @relation("RelTo")
+  interests      TripInterest[]
+  interactions   Interaction[]
+  tasks          Task[]
+  analyses       AiAnalysis[]
+
+  @@index([status])
+  @@index([ownerUserId])
+  @@index([lastName, firstName])
+  @@index([phoneMobile])
+  @@index([lastScore])
+  @@index([lastInteractionAt])
+  @@map("contacts")
+}
+
+// Stockée dans un seul sens, lue dans les deux.
+model ContactRelationship {
+  id               String       @id @default(cuid())
+  contactId        String       @map("contact_id")
+  relatedContactId String       @map("related_contact_id")
+  relation         RelationType
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  contact        Contact @relation("RelFrom", fields: [contactId], references: [id], onDelete: Cascade)
+  relatedContact Contact @relation("RelTo", fields: [relatedContactId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, relatedContactId])
+  @@index([relatedContactId])
+  @@map("contact_relationships")
+}
+
+// ───────────── Leads ─────────────
+
+model Lead {
+  id             String      @id @default(cuid())
+  contactId      String?     @map("contact_id")
+  channel        LeadChannel
+  firstName      String?     @map("first_name")
+  lastName       String?     @map("last_name")
+  email          String? // normalisé
+  phone          String? // E.164
+  callbackSlot   String?     @map("callback_slot") // libellé envoyé par le site (« 12h-14h »)
+  callbackAt     DateTime?   @map("callback_at")
+  tripId         String?     @map("trip_id")
+  message        String?     @db.Text
+  utmSource      String?     @map("utm_source")
+  utmCampaign    String?     @map("utm_campaign")
+  status         LeadStatus  @default(nouveau)
+  lostReason     String?     @map("lost_reason")
+  assignedUserId String?     @map("assigned_user_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  trip         Trip?         @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  assignedUser User?         @relation("LeadAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  tasks        Task[]
+  interactions Interaction[]
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@index([phone])
+  @@map("leads")
+}
+
+// ───────────── Catalogue ─────────────
+
+model Trip {
+  id              String      @id @default(cuid())
+  name            String
+  destination     String
+  country         String
+  region          String?
+  durationDays    Int         @map("duration_days")
+  level           RidingLevel
+  format          TripFormat
+  motorcycleModel String?     @map("motorcycle_model")
+  basePrice       Decimal     @map("base_price") @db.Decimal(10, 2)
+  description     String?     @db.Text
+  active          Boolean     @default(true)
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  departures Departure[]
+  interests  TripInterest[]
+  leads      Lead[]
+
+  @@index([active])
+  @@map("trips")
+}
+
+model Departure {
+  id         String          @id @default(cuid())
+  tripId     String          @map("trip_id")
+  startDate  DateTime        @map("start_date") @db.Date
+  endDate    DateTime        @map("end_date") @db.Date
+  price      Decimal         @db.Decimal(10, 2)
+  seatsTotal Int             @map("seats_total")
+  seatsLeft  Int             @map("seats_left") // mis à jour en transaction à chaque réservation
+  status     DepartureStatus @default(ouvert)
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  trip     Trip      @relation(fields: [tripId], references: [id], onDelete: Restrict)
+  bookings Booking[]
+
+  @@index([tripId, startDate])
+  @@index([startDate])
+  @@map("departures")
+}
+
+// ───────────── Réservations ─────────────
+
+model Booking {
+  id             String        @id @default(cuid())
+  departureId    String        @map("departure_id")
+  payerContactId String        @map("payer_contact_id")
+  totalAmount    Decimal       @map("total_amount") @db.Decimal(10, 2)
+  currency       String        @default("EUR")
+  status         BookingStatus @default(option)
+  bookedAt       DateTime      @default(now()) @map("booked_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  departure    Departure            @relation(fields: [departureId], references: [id], onDelete: Restrict)
+  payer        Contact              @relation("BookingPayer", fields: [payerContactId], references: [id], onDelete: Restrict)
+  participants BookingParticipant[]
+
+  @@index([payerContactId])
+  @@index([departureId])
+  @@map("bookings")
+}
+
+model BookingParticipant {
+  id        String    @id @default(cuid())
+  bookingId String    @map("booking_id")
+  contactId String    @map("contact_id")
+  role      RiderRole
+  amount    Decimal   @db.Decimal(10, 2)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  @@unique([bookingId, contactId])
+  @@index([contactId])
+  @@map("booking_participants")
+}
+
+// ───────────── Intérêts, interactions, tâches ─────────────
+
+model TripInterest {
+  id           String         @id @default(cuid())
+  contactId    String         @map("contact_id")
+  tripId       String?        @map("trip_id")
+  destination  String? // si pas de séjour précis ; CHECK (trip_id OU destination) dans la migration
+  source       InterestSource
+  level        InterestLevel  @default(moyen)
+  periodWanted String?        @map("period_wanted")
+  budget       Decimal?       @db.Decimal(10, 2)
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  trip    Trip?   @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@index([contactId])
+  @@index([destination])
+  @@map("trip_interests")
+}
+
+model Interaction {
+  id         String          @id @default(cuid())
+  contactId  String          @map("contact_id")
+  leadId     String?         @map("lead_id")
+  type       InteractionType
+  direction  Direction?
+  subject    String?
+  summary    String?         @db.Text
+  userId     String?         @map("user_id")
+  occurredAt DateTime        @default(now()) @map("occurred_at")
+  metadata   Json?
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  lead    Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([contactId, occurredAt(sort: Desc)])
+  @@map("interactions")
+}
+
+model Task {
+  id             String    @id @default(cuid())
+  contactId      String?   @map("contact_id")
+  leadId         String?   @map("lead_id")
+  type           TaskType
+  title          String?
+  dueAt          DateTime  @map("due_at")
+  doneAt         DateTime? @map("done_at")
+  assignedUserId String?   @map("assigned_user_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  contact      Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  lead         Lead?    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignedUser User?    @relation("TaskAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  @@index([assignedUserId, dueAt, doneAt])
+  @@index([dueAt])
+  @@map("tasks")
+}
+
+// ───────────── IA ─────────────
+
+model AiAnalysis {
+  id           String   @id @default(cuid())
+  contactId    String   @map("contact_id")
+  score        Int
+  level        AiLevel
+  summary      String   @db.Text
+  resultJson   Json     @map("result_json")
+  model        String
+  inputTokens  Int      @map("input_tokens")
+  outputTokens Int      @map("output_tokens")
+  createdById  String?  @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([contactId, createdAt(sort: Desc)])
+  @@map("ai_analyses")
+}
